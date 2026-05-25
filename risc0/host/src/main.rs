@@ -7,6 +7,7 @@ use std::{
 use anyhow::{anyhow, bail, Context, Result};
 use clap::{Parser, Subcommand};
 use methods::{METHOD_ELF, METHOD_ID};
+use risc0_ethereum_contracts::encode_seal;
 use risc0_zkvm::{
     default_prover,
     sha::{self, Sha256 as Risc0Sha256},
@@ -124,7 +125,9 @@ struct Metadata {
     groth16_requested: bool,
     wrapped_receipt_path: Option<String>,
     wrapped_proof_path: Option<String>,
+    wrapped_raw_proof_path: Option<String>,
     wrapped_proof_size_bytes: Option<u64>,
+    wrapped_raw_proof_size_bytes: Option<u64>,
     wrap_seconds: Option<f64>,
     verifier_parameters: Option<String>,
     note: String,
@@ -178,7 +181,9 @@ fn prove(args: ProveArgs) -> Result<()> {
 
     let mut wrapped_receipt_path = None;
     let mut wrapped_proof_path = None;
+    let mut wrapped_raw_proof_path = None;
     let mut wrapped_proof_size_bytes = None;
+    let mut wrapped_raw_proof_size_bytes = None;
     let mut wrap_seconds = None;
     let mut verifier_parameters = None;
 
@@ -202,11 +207,18 @@ fn prove(args: ProveArgs) -> Result<()> {
             _ => bail!("RISC Zero returned a non-Groth16 receipt for --groth16"),
         };
         let seal_path = wrapped_output.with_extension("seal");
-        fs::write(&seal_path, &groth16_receipt.seal)
+        let evm_seal = encode_seal(&wrapped_receipt)
+            .context("failed to encode Groth16 seal for EVM verifier")?;
+        fs::write(&seal_path, &evm_seal)
             .with_context(|| format!("failed to write {}", seal_path.display()))?;
+        let raw_seal_path = wrapped_output.with_extension("raw-seal");
+        fs::write(&raw_seal_path, &groth16_receipt.seal)
+            .with_context(|| format!("failed to write {}", raw_seal_path.display()))?;
         wrapped_receipt_path = Some(wrapped_output.as_path());
         wrapped_proof_path = Some(seal_path);
-        wrapped_proof_size_bytes = Some(groth16_receipt.seal.len() as u64);
+        wrapped_raw_proof_path = Some(raw_seal_path);
+        wrapped_proof_size_bytes = Some(evm_seal.len() as u64);
+        wrapped_raw_proof_size_bytes = Some(groth16_receipt.seal.len() as u64);
         verifier_parameters = Some(digest_hex(groth16_receipt.verifier_parameters));
     }
 
@@ -225,7 +237,9 @@ fn prove(args: ProveArgs) -> Result<()> {
         groth16_requested: args.groth16,
         wrapped_receipt_path,
         wrapped_proof_path: wrapped_proof_path.as_deref(),
+        wrapped_raw_proof_path: wrapped_raw_proof_path.as_deref(),
         wrapped_proof_size_bytes,
+        wrapped_raw_proof_size_bytes,
         wrap_seconds,
         verifier_parameters,
     })?;
@@ -252,7 +266,9 @@ fn verify(args: VerifyArgs) -> Result<()> {
         groth16_requested: false,
         wrapped_receipt_path: None,
         wrapped_proof_path: None,
+        wrapped_raw_proof_path: None,
         wrapped_proof_size_bytes: None,
+        wrapped_raw_proof_size_bytes: None,
         wrap_seconds: None,
         verifier_parameters: None,
     })?;
@@ -358,7 +374,9 @@ struct MetadataInput<'a> {
     groth16_requested: bool,
     wrapped_receipt_path: Option<&'a Path>,
     wrapped_proof_path: Option<&'a Path>,
+    wrapped_raw_proof_path: Option<&'a Path>,
     wrapped_proof_size_bytes: Option<u64>,
+    wrapped_raw_proof_size_bytes: Option<u64>,
     wrap_seconds: Option<f64>,
     verifier_parameters: Option<String>,
 }
@@ -391,7 +409,11 @@ fn build_metadata(input: MetadataInput<'_>) -> Result<Metadata> {
         wrapped_proof_path: input
             .wrapped_proof_path
             .map(|path| path.display().to_string()),
+        wrapped_raw_proof_path: input
+            .wrapped_raw_proof_path
+            .map(|path| path.display().to_string()),
         wrapped_proof_size_bytes: input.wrapped_proof_size_bytes,
+        wrapped_raw_proof_size_bytes: input.wrapped_raw_proof_size_bytes,
         wrap_seconds: input.wrap_seconds,
         verifier_parameters: input.verifier_parameters,
         note: if input.groth16_requested {
