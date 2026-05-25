@@ -1,18 +1,11 @@
 .env
-.env.*
-!.env.example
 __pycache__/
 *.pyc
 *.pyo
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
-benchmark/results/*.json
-benchmark/results/*.md
-benchmark/results/*.png
-benchmark/results/offchain_store/
-benchmark/results/*.bin
-benchmark/results/*.seal
+benchmark/results/*
 contracts/ApplicationAuthBenchmarkABI.json
 out/
 cache/
@@ -22,3 +15,4 @@ risc0/methods/guest/target/
 *.log
 APPLICATION_AUTH_BENCHMARK_DESIGN.md
 NEW_REPO_AI_AGENT_GUIDE.md
+AI_AGENT_HANDOFF.md
