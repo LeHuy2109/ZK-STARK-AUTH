@@ -323,6 +323,50 @@ def risc0_host_package() -> str:
     return os.getenv("RISC0_HOST_PACKAGE", DEFAULT_RISC0_HOST_PACKAGE)
 
 
+def _sensitive_cli_values(args: list[str]) -> list[str]:
+    values: list[str] = []
+    sensitive_flags = {"--app-auth-private-key"}
+    for index, arg in enumerate(args[:-1]):
+        if arg in sensitive_flags:
+            values.append(args[index + 1])
+    return values
+
+
+def _sensitive_env_values() -> list[str]:
+    return [
+        value
+        for name in ("APP_AUTH_PRIVATE_KEY", "SUBMITTER_PRIVATE_KEY")
+        for value in [os.getenv(name)]
+        if value
+    ]
+
+
+def _redact_sensitive_text(text: str, args: list[str] | None = None) -> str:
+    redacted = text
+    sensitive_values = _sensitive_env_values()
+    if args is not None:
+        sensitive_values.extend(_sensitive_cli_values(args))
+
+    for value in sensitive_values:
+        variants = [value]
+        if value.startswith("0x"):
+            variants.append(value[2:])
+        for variant in variants:
+            if variant:
+                redacted = redacted.replace(variant, "[REDACTED]")
+    return redacted
+
+
+def _risc0_failure_hint(stderr: str) -> str:
+    if "docker returned failure exit code: Some(137)" in stderr or "exit code: Some(137)" in stderr:
+        return (
+            "\nHint: Docker exit code 137 usually means the Groth16 wrapping container "
+            "was killed by the OS, most often due to insufficient RAM. Increase Docker/WSL "
+            "memory, add swap, or run a non-wrapped scenario such as cia_confidentiality_demo.py."
+        )
+    return ""
+
+
 def run_risc0_host(host_args: list[str]) -> subprocess.CompletedProcess[str]:
     cmd = ["cargo", "run", "--release", "-p", risc0_host_package()]
     cargo_features = os.getenv("RISC0_CARGO_FEATURES", "").strip()
@@ -337,9 +381,12 @@ def run_risc0_host(host_args: list[str]) -> subprocess.CompletedProcess[str]:
         check=False,
     )
     if completed.returncode != 0:
+        stdout = _redact_sensitive_text(completed.stdout, host_args)
+        stderr = _redact_sensitive_text(completed.stderr, host_args)
         raise RuntimeError(
             "RISC Zero host failed with exit code "
-            f"{completed.returncode}\nstdout:\n{completed.stdout}\nstderr:\n{completed.stderr}"
+            f"{completed.returncode}\nstdout:\n{stdout}\nstderr:\n{stderr}"
+            f"{_risc0_failure_hint(completed.stderr)}"
         )
     return completed
 
