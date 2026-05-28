@@ -87,7 +87,7 @@ def main() -> None:
     metadata_path = results_dir / "stark_wrapped_metadata.json"
     verify_metadata_path = results_dir / "stark_wrapped_verify_metadata.json"
 
-    prove_metadata, stark_prove_and_wrap_seconds = prove_risc0_auth(
+    prove_metadata, script_prove_and_wrap_wall_seconds = prove_risc0_auth(
         payload_hash=payload_hash,
         app_auth_private_key=app_auth_private_key,
         nonce=nonce,
@@ -99,7 +99,7 @@ def main() -> None:
         groth16=True,
         wrapped_output_path=wrapped_receipt_path,
     )
-    verify_metadata, stark_verify_seconds = verify_risc0_auth(
+    verify_metadata, script_verify_wall_seconds = verify_risc0_auth(
         receipt_path=wrapped_receipt_path,
         domain=STARK_WRAPPED_DOMAIN,
         payload_hash=payload_hash,
@@ -134,6 +134,10 @@ def main() -> None:
         timeout_seconds=timeout_seconds,
     )
 
+    host_prove_seconds = prove_metadata.get("prove_seconds") or 0.0
+    host_wrap_seconds = prove_metadata.get("wrap_seconds") or 0.0
+    host_verify_seconds = (verify_metadata or {}).get("verify_seconds") or 0.0
+
     result = {
         "mode": "stark_wrapped_onchain",
         "domain": STARK_WRAPPED_DOMAIN,
@@ -155,10 +159,16 @@ def main() -> None:
         "risc0_prove_metadata": prove_metadata,
         "risc0_verify_metadata": verify_metadata,
         "benchmark": {
-            "stark_prove_seconds": round(prove_metadata.get("prove_seconds") or 0.0, 6),
-            "stark_verify_seconds": round(stark_verify_seconds, 6),
-            "wrap_seconds": round(prove_metadata.get("wrap_seconds") or 0.0, 6),
-            "stark_prove_and_wrap_seconds": round(stark_prove_and_wrap_seconds, 6),
+            "host_prove_seconds": round(host_prove_seconds, 6),
+            "host_verify_seconds": round(host_verify_seconds, 6),
+            "host_wrap_seconds": round(host_wrap_seconds, 6),
+            "host_prove_and_wrap_seconds": round(host_prove_seconds + host_wrap_seconds, 6),
+            "script_prove_and_wrap_wall_seconds": round(script_prove_and_wrap_wall_seconds, 6),
+            "script_verify_wall_seconds": round(script_verify_wall_seconds, 6),
+            "stark_prove_seconds": round(host_prove_seconds, 6),
+            "stark_verify_seconds": round(host_verify_seconds, 6),
+            "wrap_seconds": round(host_wrap_seconds, 6),
+            "stark_prove_and_wrap_seconds": round(host_prove_seconds + host_wrap_seconds, 6),
             "wrapped_proof_size_bytes": prove_metadata["wrapped_proof_size_bytes"],
             "journal_size_bytes": prove_metadata["journal_size_bytes"],
             "public_input_size_bytes": public_input_size_bytes(

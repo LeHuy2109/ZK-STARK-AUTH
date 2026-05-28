@@ -16,3 +16,5 @@ risc0/methods/guest/target/
 APPLICATION_AUTH_BENCHMARK_DESIGN.md
 NEW_REPO_AI_AGENT_GUIDE.md
 AI_AGENT_HANDOFF.md
+venv/*
+report.md

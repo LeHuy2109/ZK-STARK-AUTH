@@ -387,14 +387,20 @@ metadata gas không được so với verifier gas
 Điểm đo chính:
 
 ```text
-stark_prove_seconds
-stark_verify_seconds
+host_prove_seconds
+host_verify_seconds
+script_prove_wall_seconds
+script_verify_wall_seconds
 proof_size_bytes
 journal_size_bytes
 public_input_size_bytes
 receipt_upload_seconds
 metadata_tx_gas_used nếu có --submit-metadata
 ```
+
+`host_*` là thời gian nội bộ do Rust/RISC Zero host đo. `script_*_wall_seconds`
+là thời gian Python đo khi gọi process `cargo run`, có thể bao gồm startup,
+cache, IO hoặc compile.
 
 ## Luồng `stark_wrapped_onchain`
 
@@ -449,15 +455,21 @@ Luồng:
 Điểm đo chính:
 
 ```text
-stark_prove_seconds
-wrap_seconds
-stark_prove_and_wrap_seconds
-stark_verify_seconds
+host_prove_seconds
+host_wrap_seconds
+host_prove_and_wrap_seconds
+host_verify_seconds
+script_prove_and_wrap_wall_seconds
+script_verify_wall_seconds
 wrapped_proof_size_bytes
 wrapped_verify_gas_used
 total_tx_gas_used
 raw_tx_size_bytes
 ```
+
+`host_prove_and_wrap_seconds` là tổng thời gian nội bộ RISC Zero cho prove và
+wrap. `script_prove_and_wrap_wall_seconds` là thời gian Python nhìn từ ngoài cho
+cả lệnh `prove --groth16`.
 
 Lưu ý về seal:
 

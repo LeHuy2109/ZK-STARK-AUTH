@@ -69,6 +69,42 @@ def ratio(numerator: Any, denominator: Any) -> float | None:
     return float(numerator) / float(denominator)
 
 
+def host_prove_seconds(result: dict[str, Any] | None) -> Any:
+    return (
+        metric(result, "host_prove_seconds")
+        or nested_value(result, "risc0_prove_metadata", "prove_seconds")
+        or metric(result, "stark_prove_seconds")
+    )
+
+
+def host_verify_seconds(result: dict[str, Any] | None) -> Any:
+    return (
+        metric(result, "host_verify_seconds")
+        or nested_value(result, "risc0_verify_metadata", "verify_seconds")
+        or metric(result, "stark_verify_seconds")
+    )
+
+
+def host_wrap_seconds(result: dict[str, Any] | None) -> Any:
+    return (
+        metric(result, "host_wrap_seconds")
+        or nested_value(result, "risc0_prove_metadata", "wrap_seconds")
+        or metric(result, "wrap_seconds")
+    )
+
+
+def script_prove_wall_seconds(result: dict[str, Any] | None) -> Any:
+    return metric(result, "script_prove_wall_seconds")
+
+
+def script_verify_wall_seconds(result: dict[str, Any] | None) -> Any:
+    return metric(result, "script_verify_wall_seconds")
+
+
+def script_prove_and_wrap_wall_seconds(result: dict[str, Any] | None) -> Any:
+    return metric(result, "script_prove_and_wrap_wall_seconds")
+
+
 def build_comparison(results: dict[str, dict[str, Any] | None]) -> dict[str, Any]:
     ecdsa_gas = metric(results["ecdsa_onchain"], "ecdsa_verify_gas_used")
     wrapped_gas = metric(results["stark_wrapped_onchain"], "wrapped_verify_gas_used")
@@ -146,19 +182,40 @@ def build_comparison(results: dict[str, dict[str, Any] | None]) -> dict[str, Any
                 "signature_size_bytes": metric(results["ecdsa_onchain"], "signature_size_bytes"),
             },
             "stark_offchain": {
-                "stark_prove_seconds": metric(results["stark_offchain"], "stark_prove_seconds"),
-                "stark_verify_seconds": metric(results["stark_offchain"], "stark_verify_seconds"),
+                "host_prove_seconds": host_prove_seconds(results["stark_offchain"]),
+                "host_verify_seconds": host_verify_seconds(results["stark_offchain"]),
                 "proof_size_bytes": metric(results["stark_offchain"], "proof_size_bytes"),
             },
             "stark_wrapped_onchain": {
                 "status": "pending_milestone_2" if results["stark_wrapped_onchain"] is None else "available",
-                "stark_prove_seconds": metric(results["stark_wrapped_onchain"], "stark_prove_seconds"),
-                "stark_verify_seconds": metric(results["stark_wrapped_onchain"], "stark_verify_seconds"),
-                "wrap_seconds": metric(results["stark_wrapped_onchain"], "wrap_seconds"),
+                "host_prove_seconds": host_prove_seconds(results["stark_wrapped_onchain"]),
+                "host_verify_seconds": host_verify_seconds(results["stark_wrapped_onchain"]),
+                "host_wrap_seconds": host_wrap_seconds(results["stark_wrapped_onchain"]),
                 "wrapped_proof_size_bytes": metric(
                     results["stark_wrapped_onchain"], "wrapped_proof_size_bytes"
                 ),
             },
+        },
+        "script_wall_clock": {
+            "stark_offchain": {
+                "prove_command_seconds": script_prove_wall_seconds(results["stark_offchain"])
+                or metric(results["stark_offchain"], "stark_prove_seconds"),
+                "verify_command_seconds": script_verify_wall_seconds(results["stark_offchain"])
+                or metric(results["stark_offchain"], "stark_verify_seconds"),
+            },
+            "stark_wrapped_onchain": {
+                "prove_and_wrap_command_seconds": script_prove_and_wrap_wall_seconds(
+                    results["stark_wrapped_onchain"]
+                )
+                or metric(results["stark_wrapped_onchain"], "script_prove_and_wrap_wall_seconds")
+                or metric(results["stark_wrapped_onchain"], "stark_prove_and_wrap_seconds"),
+                "verify_command_seconds": script_verify_wall_seconds(results["stark_wrapped_onchain"])
+                or metric(results["stark_wrapped_onchain"], "stark_verify_seconds"),
+            },
+            "note": (
+                "Wall-clock command time includes cargo startup, process startup, IO, cache state, "
+                "and possible compilation. Host runtime is the cleaner RISC Zero timing."
+            ),
         },
         "artifact_sizes": {
             "ecdsa_onchain": {
@@ -243,6 +300,7 @@ def render_markdown(comparison: dict[str, Any]) -> str:
     status = comparison["execution_status"]
     binding = comparison["authorization_binding"]
     offchain = comparison["offchain_cost"]
+    wall_clock = comparison["script_wall_clock"]
     artifacts = comparison["artifact_sizes"]
     onchain = comparison["onchain_verifier_comparison"]
     ratios = comparison["onchain_ratios"]
@@ -321,7 +379,9 @@ def render_markdown(comparison: dict[str, Any]) -> str:
             ],
         ),
         "",
-        "## Off-chain Cost",
+        "## Host Runtime",
+        "",
+        "These timings are measured inside the RISC Zero host process. They exclude Python process overhead, cargo startup, file IO outside the measured host blocks, and network transaction time.",
         "",
         render_table(
             ["Mode", "Sign/Prove (s)", "Verify (s)", "Wrap (s)", "Auth/Proof Bytes"],
@@ -335,17 +395,39 @@ def render_markdown(comparison: dict[str, Any]) -> str:
                 ],
                 [
                     "stark_offchain",
-                    offchain["stark_offchain"]["stark_prove_seconds"],
-                    offchain["stark_offchain"]["stark_verify_seconds"],
+                    offchain["stark_offchain"]["host_prove_seconds"],
+                    offchain["stark_offchain"]["host_verify_seconds"],
                     "-",
                     offchain["stark_offchain"]["proof_size_bytes"],
                 ],
                 [
                     "stark_wrapped_onchain",
-                    offchain["stark_wrapped_onchain"]["stark_prove_seconds"],
-                    offchain["stark_wrapped_onchain"]["stark_verify_seconds"],
-                    offchain["stark_wrapped_onchain"]["wrap_seconds"],
+                    offchain["stark_wrapped_onchain"]["host_prove_seconds"],
+                    offchain["stark_wrapped_onchain"]["host_verify_seconds"],
+                    offchain["stark_wrapped_onchain"]["host_wrap_seconds"],
                     offchain["stark_wrapped_onchain"]["wrapped_proof_size_bytes"],
+                ],
+            ],
+        ),
+        "",
+        "## Script Wall Clock",
+        "",
+        wall_clock["note"],
+        "",
+        render_table(
+            ["Mode", "Prove Command (s)", "Verify Command (s)", "Wrap Included"],
+            [
+                [
+                    "stark_offchain",
+                    wall_clock["stark_offchain"]["prove_command_seconds"],
+                    wall_clock["stark_offchain"]["verify_command_seconds"],
+                    "no",
+                ],
+                [
+                    "stark_wrapped_onchain",
+                    wall_clock["stark_wrapped_onchain"]["prove_and_wrap_command_seconds"],
+                    wall_clock["stark_wrapped_onchain"]["verify_command_seconds"],
+                    "yes",
                 ],
             ],
         ),

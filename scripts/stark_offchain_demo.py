@@ -90,7 +90,7 @@ def main() -> None:
     metadata_path = results_dir / "stark_offchain_metadata.json"
     verify_metadata_path = results_dir / "stark_offchain_verify_metadata.json"
 
-    prove_metadata, stark_prove_seconds = prove_risc0_auth(
+    prove_metadata, script_prove_wall_seconds = prove_risc0_auth(
         payload_hash=payload_hash,
         app_auth_private_key=app_auth_private_key,
         nonce=nonce,
@@ -100,7 +100,7 @@ def main() -> None:
         metadata_path=metadata_path,
         domain=STARK_DOMAIN,
     )
-    verify_metadata, stark_verify_seconds = verify_risc0_auth(
+    verify_metadata, script_verify_wall_seconds = verify_risc0_auth(
         receipt_path=receipt_path,
         domain=STARK_DOMAIN,
         payload_hash=payload_hash,
@@ -144,9 +144,16 @@ def main() -> None:
             timeout_seconds=timeout_seconds,
         )
 
+    host_prove_seconds = prove_metadata.get("prove_seconds") or 0.0
+    host_verify_seconds = (verify_metadata or {}).get("verify_seconds") or 0.0
+
     benchmark = {
-        "stark_prove_seconds": round(stark_prove_seconds, 6),
-        "stark_verify_seconds": round(stark_verify_seconds, 6),
+        "host_prove_seconds": round(host_prove_seconds, 6),
+        "host_verify_seconds": round(host_verify_seconds, 6),
+        "script_prove_wall_seconds": round(script_prove_wall_seconds, 6),
+        "script_verify_wall_seconds": round(script_verify_wall_seconds, 6),
+        "stark_prove_seconds": round(host_prove_seconds, 6),
+        "stark_verify_seconds": round(host_verify_seconds, 6),
         "proof_size_bytes": len(receipt_bytes),
         "journal_size_bytes": prove_metadata["journal_size_bytes"],
         "public_input_size_bytes": public_input_size_bytes(
