@@ -87,6 +87,7 @@ Ba script CIA chạy lại các primitive hiện có và ghi output vào `benchm
 
 ```bash
 python3 scripts/cia_confidentiality_demo.py
+python3 scripts/cia_confidentiality_negative_identity_commitment_demo.py
 python3 scripts/cia_integrity_demo.py
 python3 scripts/cia_availability_benchmark.py --rounds 3
 ```
@@ -95,6 +96,11 @@ python3 scripts/cia_availability_benchmark.py --rounds 3
 dùng `APP_AUTH_PRIVATE_KEY` làm private witness nhưng không in hoặc ghi secret
 vào result. Output chính là `cia_confidentiality_result.json`; thêm
 `--negative-wrong-secret` để verify receipt với public input sai và kỳ vọng fail.
+
+`cia_confidentiality_negative_identity_commitment_demo.py` là negative script
+riêng: nó sinh receipt hợp lệ từ `APP_AUTH_PRIVATE_KEY`, rồi chỉ gọi `verify`
+một lần với `identity_commitment` đã bị tamper và kỳ vọng fail. Output chính là
+`cia_confidentiality_negative_identity_commitment_result.json`.
 
 `cia_integrity_demo.py` dùng `stark_wrapped_onchain`: positive case gửi payload
 gốc và wrapped proof hợp lệ lên contract; negative cases gửi payload bị sửa với
